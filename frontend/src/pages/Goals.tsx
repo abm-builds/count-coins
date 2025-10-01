@@ -16,15 +16,16 @@ import { Plus, Target, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Goals() {
-  const { goals, addGoal, updateGoal, deleteGoal } = useFinance();
+  const { goals, addGoal, updateGoal, deleteGoal, isLoading } = useFinance();
   const [isOpen, setIsOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     targetAmount: "",
     deadline: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.title || !formData.targetAmount) {
@@ -32,29 +33,41 @@ export default function Goals() {
       return;
     }
 
-    addGoal({
-      title: formData.title,
-      targetAmount: parseFloat(formData.targetAmount),
-      currentAmount: 0,
-      deadline: formData.deadline,
-    });
+    setIsSubmitting(true);
+    try {
+      await addGoal({
+        title: formData.title,
+        targetAmount: parseFloat(formData.targetAmount),
+        currentAmount: 0,
+        deadline: formData.deadline,
+      });
 
-    toast.success("Goal created successfully");
-    setIsOpen(false);
-    setFormData({ title: "", targetAmount: "", deadline: "" });
-  };
-
-  const handleAddProgress = (id: string, amount: number) => {
-    const goal = goals.find((g) => g.id === id);
-    if (goal) {
-      updateGoal(id, { currentAmount: goal.currentAmount + amount });
-      toast.success("Progress updated");
+      setIsOpen(false);
+      setFormData({ title: "", targetAmount: "", deadline: "" });
+    } catch (error) {
+      // Error is handled by FinanceContext
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleDelete = (id: string) => {
-    deleteGoal(id);
-    toast.success("Goal deleted");
+  const handleAddProgress = async (id: string, amount: number) => {
+    const goal = goals.find((g) => g.id === id);
+    if (goal) {
+      try {
+        await updateGoal(id, { currentAmount: goal.currentAmount + amount });
+      } catch (error) {
+        // Error is handled by FinanceContext
+      }
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteGoal(id);
+    } catch (error) {
+      // Error is handled by FinanceContext
+    }
   };
 
   return (
@@ -117,15 +130,22 @@ export default function Goals() {
                   />
                 </div>
 
-                <Button type="submit" className="w-full bg-gradient-primary">
-                  Create Goal
+                <Button type="submit" className="w-full bg-gradient-primary" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Goal"}
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
         </div>
 
-        {goals.length === 0 ? (
+        {isLoading ? (
+          <Card className="p-12 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+              <Target className="w-8 h-8 text-muted-foreground animate-pulse" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Loading...</h3>
+          </Card>
+        ) : goals.length === 0 ? (
           <Card className="p-12 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
               <Target className="w-8 h-8 text-muted-foreground" />

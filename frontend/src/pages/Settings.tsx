@@ -10,13 +10,19 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useFinance, BudgetRule } from "@/contexts/FinanceContext";
-import { Moon, Sun, Download, Trash2 } from "lucide-react";
+import { Moon, Sun, Download, Upload, LogOut, UserX } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
+import { useRef } from "react";
 
 export default function Settings() {
   const { theme, toggleTheme } = useTheme();
-  const { budgetRule, setBudgetRule, transactions, goals } = useFinance();
+  const { user, logout, deleteAccount } = useAuth();
+  const { budgetRule, setBudgetRule, transactions, goals, addTransaction, addGoal, refetchAll } = useFinance();
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportData = () => {
     const data = {
@@ -39,10 +45,97 @@ export default function Settings() {
     toast.success("Data exported successfully");
   };
 
-  const handleClearData = () => {
-    if (confirm("Are you sure you want to clear all data? This action cannot be undone.")) {
-      localStorage.clear();
-      window.location.reload();
+  const handleLogout = () => {
+    if (confirm("Are you sure you want to log out?")) {
+      logout();
+      navigate("/login");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (
+      confirm(
+        "Are you sure you want to delete your account? This will permanently delete all your data and cannot be undone."
+      )
+    ) {
+      try {
+        await deleteAccount();
+        navigate("/login");
+      } catch (error) {
+        // Error is handled by AuthContext
+      }
+    }
+  };
+
+  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // Validate data structure
+      if (!data.transactions && !data.goals) {
+        toast.error("Invalid data file format");
+        return;
+      }
+
+      let importedCount = 0;
+
+      // Import transactions
+      if (data.transactions && Array.isArray(data.transactions)) {
+        for (const transaction of data.transactions) {
+          try {
+            await addTransaction({
+              amount: transaction.amount,
+              type: transaction.type,
+              category: transaction.category,
+              description: transaction.description,
+              date: transaction.date,
+            });
+            importedCount++;
+          } catch (error) {
+            console.error("Failed to import transaction:", error);
+          }
+        }
+      }
+
+      // Import goals
+      if (data.goals && Array.isArray(data.goals)) {
+        for (const goal of data.goals) {
+          try {
+            await addGoal({
+              title: goal.title,
+              targetAmount: goal.targetAmount,
+              currentAmount: goal.currentAmount,
+              deadline: goal.deadline,
+            });
+            importedCount++;
+          } catch (error) {
+            console.error("Failed to import goal:", error);
+          }
+        }
+      }
+
+      // Import budget rule if present
+      if (data.budgetRule) {
+        try {
+          await setBudgetRule(data.budgetRule);
+        } catch (error) {
+          console.error("Failed to import budget rule:", error);
+        }
+      }
+
+      refetchAll();
+      toast.success(`Successfully imported ${importedCount} items!`);
+    } catch (error) {
+      toast.error("Failed to import data. Please check the file format.");
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -56,6 +149,26 @@ export default function Settings() {
 
         <Card className="p-6 space-y-6">
           <div>
+            <h2 className="text-lg font-semibold mb-4">Account</h2>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <Label className="text-base font-medium">Email</Label>
+                  <p className="text-sm text-muted-foreground">{user?.email}</p>
+                </div>
+              </div>
+              {user?.name && (
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <Label className="text-base font-medium">Name</Label>
+                    <p className="text-sm text-muted-foreground">{user.name}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t pt-6">
             <h2 className="text-lg font-semibold mb-4">Appearance</h2>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -87,9 +200,12 @@ export default function Settings() {
               <Label htmlFor="budget-rule">Budget Rule</Label>
               <Select
                 value={budgetRule}
-                onValueChange={(value: BudgetRule) => {
-                  setBudgetRule(value);
-                  toast.success("Budget rule updated");
+                onValueChange={async (value: BudgetRule) => {
+                  try {
+                    await setBudgetRule(value);
+                  } catch (error) {
+                    // Error is handled by FinanceContext
+                  }
                 }}
               >
                 <SelectTrigger id="budget-rule">
@@ -119,13 +235,50 @@ export default function Settings() {
                 Export Data
               </Button>
               
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportData}
+                  className="hidden"
+                  id="import-file"
+                />
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import Data
+                </Button>
+              </div>
+              
+              <p className="text-xs text-muted-foreground">
+                Export your data as JSON or import previously exported data
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t pt-6">
+            <h2 className="text-lg font-semibold mb-4">Account Actions</h2>
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Log Out
+              </Button>
+              
               <Button
                 variant="outline"
                 className="w-full justify-start text-destructive hover:text-destructive"
-                onClick={handleClearData}
+                onClick={handleDeleteAccount}
               >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Clear All Data
+                <UserX className="w-4 h-4 mr-2" />
+                Delete Account
               </Button>
             </div>
           </div>

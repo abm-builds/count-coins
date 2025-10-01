@@ -23,8 +23,9 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Transactions() {
-  const { transactions, addTransaction, deleteTransaction } = useFinance();
+  const { transactions, addTransaction, deleteTransaction, isLoading } = useFinance();
   const [isOpen, setIsOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     amount: "",
     type: "expense" as TransactionType,
@@ -32,7 +33,7 @@ export default function Transactions() {
     description: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.amount || !formData.description) {
@@ -40,27 +41,36 @@ export default function Transactions() {
       return;
     }
 
-    addTransaction({
-      amount: parseFloat(formData.amount),
-      type: formData.type,
-      category: formData.category,
-      description: formData.description,
-      date: new Date().toISOString(),
-    });
+    setIsSubmitting(true);
+    try {
+      await addTransaction({
+        amount: parseFloat(formData.amount),
+        type: formData.type,
+        category: formData.category,
+        description: formData.description,
+        date: new Date().toISOString(),
+      });
 
-    toast.success(`${formData.type === "income" ? "Income" : "Expense"} added successfully`);
-    setIsOpen(false);
-    setFormData({
-      amount: "",
-      type: "expense",
-      category: "needs",
-      description: "",
-    });
+      setIsOpen(false);
+      setFormData({
+        amount: "",
+        type: "expense",
+        category: "needs",
+        description: "",
+      });
+    } catch (error) {
+      // Error is handled by FinanceContext
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    deleteTransaction(id);
-    toast.success("Transaction deleted");
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteTransaction(id);
+    } catch (error) {
+      // Error is handled by FinanceContext
+    }
   };
 
   return (
@@ -150,15 +160,22 @@ export default function Transactions() {
                   />
                 </div>
 
-                <Button type="submit" className="w-full bg-gradient-primary">
-                  Add Transaction
+                <Button type="submit" className="w-full bg-gradient-primary" disabled={isSubmitting}>
+                  {isSubmitting ? "Adding..." : "Add Transaction"}
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
         </div>
 
-        {transactions.length === 0 ? (
+        {isLoading ? (
+          <Card className="p-12 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+              <Plus className="w-8 h-8 text-muted-foreground animate-pulse" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Loading...</h3>
+          </Card>
+        ) : transactions.length === 0 ? (
           <Card className="p-12 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
               <Plus className="w-8 h-8 text-muted-foreground" />
