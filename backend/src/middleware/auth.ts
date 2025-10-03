@@ -9,6 +9,9 @@ export interface AuthenticatedRequest extends Request {
     id: string;
     email: string;
   };
+  params: any;
+  body: any;
+  headers: any;
 }
 
 export const authenticateToken = async (

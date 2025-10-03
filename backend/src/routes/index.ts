@@ -13,7 +13,7 @@ router.use('/budget', budgetRoutes);
 router.use('/goals', goalRoutes);
 
 // Health check endpoint
-router.get('/health', (req, res) => {
+router.get('/health', (req: any, res: any) => {
   res.json({
     success: true,
     message: 'Count Coins API is running',

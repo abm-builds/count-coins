@@ -48,7 +48,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api', routes);
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get('/', (req: any, res: any) => {
   res.json({
     success: true,
     message: 'Count Coins Finance Tracker API',

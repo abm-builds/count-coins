@@ -68,7 +68,7 @@ export const errorHandler = (
   }
 
   // Log error in development
-  if (process.env.NODE_ENV === 'development') {
+  if ((process as any).env.NODE_ENV === 'development') {
     console.error('Error:', {
       message: error.message,
       stack: error.stack,
@@ -81,7 +81,7 @@ export const errorHandler = (
   res.status(statusCode).json({
     success: false,
     error: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
+    ...((process as any).env.NODE_ENV === 'development' && { stack: error.stack }),
   });
 };
 
