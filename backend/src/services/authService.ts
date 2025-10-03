@@ -20,8 +20,8 @@ export class AuthService {
   static generateToken(userId: string, email: string): string {
     return jwt.sign(
       { userId, email },
-      env.JWT_SECRET,
-      { expiresIn: env.JWT_EXPIRES_IN }
+      env.JWT_SECRET as string,
+      { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions
     );
   }
 
@@ -44,7 +44,7 @@ export class AuthService {
     const user = await prisma.user.create({
       data: {
         email,
-        name,
+        name: name || null,
         passwordHash,
       },
       select: {
@@ -62,7 +62,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
+        name: user.name || undefined,
         createdAt: user.createdAt,
       },
       token,
@@ -94,6 +94,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        name: user.name || undefined,
         createdAt: user.createdAt,
       },
       token,
@@ -115,7 +116,12 @@ export class AuthService {
       throw createError('User not found', 404);
     }
 
-    return user;
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name || undefined,
+      createdAt: user.createdAt,
+    };
   }
 
   static async updateProfile(userId: string, data: { email?: string; password?: string }): Promise<AuthUser> {
@@ -144,11 +150,17 @@ export class AuthService {
       select: {
         id: true,
         email: true,
+        name: true,
         createdAt: true,
       },
     });
 
-    return user;
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name || undefined,
+      createdAt: user.createdAt,
+    };
   }
 
   static async deleteAccount(userId: string): Promise<void> {

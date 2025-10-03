@@ -39,7 +39,7 @@ export class AuthController {
 
   static updateProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const data = validateRequest(loginSchema.partial(), req.body);
-    const user = await AuthService.updateProfile(req.user!.id, data);
+    const user = await AuthService.updateProfile(req.user!.id, data as { email?: string; password?: string });
 
     res.json({
       success: true,

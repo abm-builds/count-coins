@@ -28,6 +28,7 @@ export class GoalController {
 
   static getGoal = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
+    if (!id) throw new Error('Goal ID is required');
     const goal = await GoalService.getGoalById(req.user!.id, id);
 
     res.json({
@@ -38,6 +39,7 @@ export class GoalController {
 
   static updateGoal = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
+    if (!id) throw new Error('Goal ID is required');
     const data = validateRequest(updateGoalSchema, req.body);
     const goal = await GoalService.updateGoal(req.user!.id, id, data);
 
@@ -50,6 +52,7 @@ export class GoalController {
 
   static deleteGoal = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
+    if (!id) throw new Error('Goal ID is required');
     await GoalService.deleteGoal(req.user!.id, id);
 
     res.json({

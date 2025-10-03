@@ -24,7 +24,7 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 export interface AuthUser {
   id: string;
   email: string;
-  name?: string;
+  name?: string | undefined;
   createdAt: Date;
 }
 
@@ -36,7 +36,7 @@ export interface LoginRequest {
 export interface SignupRequest {
   email: string;
   password: string;
-  name?: string;
+  name?: string | undefined;
 }
 
 export interface AuthResponse {
@@ -50,7 +50,7 @@ export interface CreateTransactionRequest {
   type: TransactionType;
   category: TransactionCategory;
   description: string;
-  date?: string;
+  date?: string | undefined;
 }
 
 export interface UpdateTransactionRequest extends Partial<CreateTransactionRequest> {}
@@ -82,12 +82,12 @@ export interface BudgetSummary {
 export interface CreateGoalRequest {
   title: string;
   targetAmount: number;
-  currentAmount?: number;
-  deadline?: string;
+  currentAmount?: number | undefined;
+  deadline?: string | undefined;
 }
 
 export interface UpdateGoalRequest extends Partial<CreateGoalRequest> {
-  currentAmount?: number;
+  currentAmount?: number | undefined;
 }
 
 // JWT Payload

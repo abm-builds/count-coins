@@ -1,0 +1,31 @@
+# render.yaml - Render deployment configuration
+services:
+  - type: web
+    name: count-coins-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        value: https://your-frontend-domain.vercel.app
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+      - key: DATABASE_URL
+        sync: false  # You'll set this manually with your Supabase connection string
+      - key: SUPABASE_URL
+        sync: false  # You'll set this manually with your Supabase project URL
+      - key: SUPABASE_ANON_KEY
+        sync: false  # You'll set this manually with your Supabase anon key
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false  # You'll set this manually with your Supabase service role key

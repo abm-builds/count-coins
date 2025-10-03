@@ -19,9 +19,9 @@ export class TransactionController {
 
   static getTransactions = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const query = validateQuery(transactionQuerySchema, req.query);
-    const { transactions, total } = await TransactionService.getTransactions(req.user!.id, query);
+    const { transactions, total } = await TransactionService.getTransactions(req.user!.id, query as any);
 
-    const totalPages = Math.ceil(total / query.limit);
+    const totalPages = Math.ceil(total / (Number(query.limit) || 10));
 
     res.json({
       success: true,
@@ -37,6 +37,7 @@ export class TransactionController {
 
   static getTransaction = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
+    if (!id) throw new Error('Transaction ID is required');
     const transaction = await TransactionService.getTransactionById(req.user!.id, id);
 
     res.json({
@@ -47,6 +48,7 @@ export class TransactionController {
 
   static updateTransaction = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
+    if (!id) throw new Error('Transaction ID is required');
     const data = validateRequest(updateTransactionSchema, req.body);
     const transaction = await TransactionService.updateTransaction(req.user!.id, id, data);
 
@@ -59,6 +61,7 @@ export class TransactionController {
 
   static deleteTransaction = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
+    if (!id) throw new Error('Transaction ID is required');
     await TransactionService.deleteTransaction(req.user!.id, id);
 
     res.json({
