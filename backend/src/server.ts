@@ -65,11 +65,19 @@ app.use(errorHandler);
 
 const PORT = env.PORT;
 
+console.log('🔧 Starting server...');
+console.log('📊 Environment:', env.NODE_ENV);
+console.log('🌐 CORS Origin:', env.CORS_ORIGIN);
+console.log('🔗 Database URL configured:', !!env.DATABASE_URL);
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${env.NODE_ENV}`);
   console.log(`🌐 CORS Origin: ${env.CORS_ORIGIN}`);
   console.log(`📝 API Documentation: http://localhost:${PORT}/api/health`);
+}).on('error', (error) => {
+  console.error('❌ Server failed to start:', error);
+  process.exit(1);
 });
 
 export default app;

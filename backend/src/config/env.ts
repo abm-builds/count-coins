@@ -15,6 +15,15 @@ const envSchema = z.object({
   RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).default('100'),
 });
 
-export const env = envSchema.parse(process.env);
+let env: z.infer<typeof envSchema>;
+
+try {
+  env = envSchema.parse(process.env);
+} catch (error) {
+  console.error('❌ Environment validation failed:', error);
+  process.exit(1);
+}
+
+export { env };
 
 export type Env = z.infer<typeof envSchema>;
