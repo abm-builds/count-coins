@@ -32,9 +32,24 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 dark:from-gray-900 dark:via-purple-900 dark:to-gray-900 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
+          {/* Logo and Brand */}
+          <div className="flex flex-col items-center space-y-3 mb-4">
+            <div className="w-16 h-16 flex items-center justify-center">
+              <img 
+                src="/logo.png" 
+                alt="CountCoins Logo" 
+                className="w-14 h-14 object-contain"
+              />
+            </div>
+            <div className="text-center">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                CountCoins
+              </h1>
+              <p className="text-sm text-muted-foreground">Welcome Back</p>
+            </div>
+          </div>
           <CardDescription className="text-center">
-            Sign in to your Count Coins account
+            Sign in to your CountCoins account
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -66,22 +81,28 @@ const Login = () => {
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign In
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
+              )}
             </Button>
-            <div className="text-center space-y-2">
-              <Link 
-                to="/forgot-password" 
-                className="text-sm text-primary hover:underline block"
+            <div className="text-center text-sm">
+              <Link
+                to="/forgot-password"
+                className="text-primary hover:underline"
               >
-                Forgot password?
+                Forgot your password?
               </Link>
-              <p className="text-sm text-muted-foreground">
-                Don't have an account?{' '}
-                <Link to="/signup" className="text-primary hover:underline font-medium">
-                  Sign up
-                </Link>
-              </p>
+            </div>
+            <div className="text-center text-sm">
+              Don't have an account?{' '}
+              <Link to="/signup" className="text-primary hover:underline">
+                Sign up
+              </Link>
             </div>
           </CardFooter>
         </form>
@@ -91,4 +112,3 @@ const Login = () => {
 };
 
 export default Login;
-

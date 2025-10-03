@@ -24,6 +24,7 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 export interface AuthUser {
   id: string;
   email: string;
+  name?: string;
   createdAt: Date;
 }
 
@@ -35,6 +36,7 @@ export interface LoginRequest {
 export interface SignupRequest {
   email: string;
   password: string;
+  name?: string;
 }
 
 export interface AuthResponse {
@@ -80,6 +82,7 @@ export interface BudgetSummary {
 export interface CreateGoalRequest {
   title: string;
   targetAmount: number;
+  currentAmount?: number;
   deadline?: string;
 }
 

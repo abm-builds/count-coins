@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { prisma } from '@/config/database';
 import { env } from '@/config/env';
 import { AuthUser, LoginRequest, SignupRequest, AuthResponse, JwtPayload } from '@/types';
@@ -25,7 +26,7 @@ export class AuthService {
   }
 
   static async signup(data: SignupRequest): Promise<AuthResponse> {
-    const { email, password } = data;
+    const { email, password, name } = data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -43,11 +44,13 @@ export class AuthService {
     const user = await prisma.user.create({
       data: {
         email,
+        name,
         passwordHash,
       },
       select: {
         id: true,
         email: true,
+        name: true,
         createdAt: true,
       },
     });
@@ -59,6 +62,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        name: user.name,
         createdAt: user.createdAt,
       },
       token,
@@ -102,6 +106,7 @@ export class AuthService {
       select: {
         id: true,
         email: true,
+        name: true,
         createdAt: true,
       },
     });
@@ -149,6 +154,61 @@ export class AuthService {
   static async deleteAccount(userId: string): Promise<void> {
     await prisma.user.delete({
       where: { id: userId },
+    });
+  }
+
+  static async requestPasswordReset(email: string): Promise<void> {
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    // Always return success to prevent email enumeration
+    if (!user) {
+      return;
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Save reset token to database
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires,
+      },
+    });
+
+    // TODO: Send email with reset link
+    // In a real application, you would send an email here with the reset token
+    // For now, we'll just log it for development purposes
+    console.log(`Password reset token for ${email}: ${resetToken}`);
+    console.log(`Reset link: ${env.CORS_ORIGIN}/reset-password?token=${resetToken}`);
+  }
+
+  static async resetPassword(token: string, password: string): Promise<void> {
+    // Find user by reset token
+    const user = await prisma.user.findUnique({
+      where: { passwordResetToken: token },
+    });
+
+    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      throw createError('Invalid or expired reset token', 400);
+    }
+
+    // Hash new password
+    const passwordHash = await this.hashPassword(password);
+
+    // Update user password and clear reset token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
     });
   }
 }

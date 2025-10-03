@@ -3,15 +3,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 
+// Import env config (which now loads dotenv internally)
 import { env } from '@/config/env';
 import { generalLimiter } from '@/middleware/rateLimiter';
 import { errorHandler, notFoundHandler } from '@/middleware/errorHandler';
 import routes from '@/routes';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 
@@ -21,8 +18,12 @@ app.use(helmet({
 }));
 
 // CORS configuration
+const allowedOrigins = env.NODE_ENV === 'development' 
+  ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000']
+  : [env.CORS_ORIGIN];
+
 app.use(cors({
-  origin: env.CORS_ORIGIN,
+  origin: allowedOrigins,
   credentials: true,
 }));
 

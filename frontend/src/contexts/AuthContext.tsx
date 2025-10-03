@@ -1,15 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authService, User, SignupData, LoginData } from '@/services/authService';
-import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { authService, LoginData, SignupData, User } from '@/services/authService';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
-  isAuthenticated: boolean;
   isLoading: boolean;
+  isAuthenticated: boolean;
   login: (data: LoginData) => Promise<void>;
   signup: (data: SignupData) => Promise<void>;
   logout: () => void;
-  updateUser: (data: Partial<SignupData>) => Promise<void>;
   deleteAccount: () => Promise<void>;
 }
 
@@ -18,9 +18,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Check if user is logged in on mount
+  // Derive isAuthenticated from user state
+  const isAuthenticated = !!user;
+
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('auth-token');
@@ -47,89 +49,62 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (data: LoginData) => {
     try {
-      const response = await authService.login(data);
-      localStorage.setItem('auth-token', response.token);
-      localStorage.setItem('auth-user', JSON.stringify(response.user));
-      setUser(response.user);
-      toast({
-        title: 'Success',
-        description: 'Logged in successfully!',
-      });
+      const result = await authService.login(data);
+      setUser(result.user);
+      localStorage.setItem('auth-token', result.token);
+      localStorage.setItem('auth-user', JSON.stringify(result.user));
+      
+      // Invalidate all queries to refresh data
+      queryClient.invalidateQueries();
+      
+      toast.success('Login successful!');
     } catch (error: any) {
-      toast({
-        title: 'Login Failed',
-        description: error.message || 'Invalid email or password',
-        variant: 'destructive',
-      });
+      toast.error(error.message || 'Login failed');
       throw error;
     }
   };
 
   const signup = async (data: SignupData) => {
     try {
-      const response = await authService.signup(data);
-      localStorage.setItem('auth-token', response.token);
-      localStorage.setItem('auth-user', JSON.stringify(response.user));
-      setUser(response.user);
-      toast({
-        title: 'Success',
-        description: 'Account created successfully!',
-      });
+      const result = await authService.signup(data);
+      setUser(result.user);
+      localStorage.setItem('auth-token', result.token);
+      localStorage.setItem('auth-user', JSON.stringify(result.user));
+      
+      // Invalidate all queries to refresh data
+      queryClient.invalidateQueries();
+      
+      toast.success('Account created successfully!');
     } catch (error: any) {
-      toast({
-        title: 'Signup Failed',
-        description: error.message || 'Could not create account',
-        variant: 'destructive',
-      });
+      toast.error(error.message || 'Signup failed');
       throw error;
     }
   };
 
   const logout = () => {
+    setUser(null);
     localStorage.removeItem('auth-token');
     localStorage.removeItem('auth-user');
-    setUser(null);
-    toast({
-      title: 'Logged Out',
-      description: 'You have been logged out successfully',
-    });
-  };
-
-  const updateUser = async (data: Partial<SignupData>) => {
-    try {
-      const updatedUser = await authService.updateProfile(data);
-      setUser(updatedUser);
-      localStorage.setItem('auth-user', JSON.stringify(updatedUser));
-      toast({
-        title: 'Success',
-        description: 'Profile updated successfully!',
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Update Failed',
-        description: error.message || 'Could not update profile',
-        variant: 'destructive',
-      });
-      throw error;
-    }
+    
+    // Clear all cached data
+    queryClient.clear();
+    
+    toast.success('Logged out successfully');
   };
 
   const deleteAccount = async () => {
     try {
       await authService.deleteAccount();
+      setUser(null);
       localStorage.removeItem('auth-token');
       localStorage.removeItem('auth-user');
-      setUser(null);
-      toast({
-        title: 'Account Deleted',
-        description: 'Your account has been deleted successfully',
-      });
+      
+      // Clear all cached data
+      queryClient.clear();
+      
+      toast.success('Account deleted successfully');
     } catch (error: any) {
-      toast({
-        title: 'Delete Failed',
-        description: error.message || 'Could not delete account',
-        variant: 'destructive',
-      });
+      toast.error(error.message || 'Failed to delete account');
       throw error;
     }
   };
@@ -138,12 +113,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
         isLoading,
+        isAuthenticated,
         login,
         signup,
         logout,
-        updateUser,
         deleteAccount,
       }}
     >
@@ -159,4 +133,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

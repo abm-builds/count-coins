@@ -20,14 +20,27 @@ export const BottomNav = () => {
             end={item.to === "/"}
             className={({ isActive }) =>
               cn(
-                "flex flex-col items-center justify-center flex-1 h-full transition-colors",
+                "flex flex-col items-center justify-center flex-1 h-full transition-colors relative",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )
             }
           >
-            <item.icon className="w-6 h-6 mb-1" />
+            {/* Logo for Home tab */}
+            {item.to === "/" && (
+              <div className="w-6 h-6 mb-1 flex items-center justify-center">
+                <img 
+                  src="/logo.png" 
+                  alt="CountCoins" 
+                  className="w-6 h-6 object-contain"
+                />
+              </div>
+            )}
+            {/* Regular icon for other tabs */}
+            {item.to !== "/" && (
+              <item.icon className="w-6 h-6 mb-1" />
+            )}
             <span className="text-xs font-medium">{item.label}</span>
           </NavLink>
         ))}

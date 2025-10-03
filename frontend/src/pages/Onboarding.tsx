@@ -40,64 +40,70 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-lg animate-fade-in">
+        {/* Header with Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-primary mb-4">
-            <PiggyBank className="w-8 h-8 text-white" />
+          <div className="flex flex-col items-center space-y-4">
+            <div className="w-20 h-20 flex items-center justify-center">
+              <img 
+                src="/logo.png" 
+                alt="CountCoins Logo" 
+                className="w-16 h-16 object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Welcome to CountCoins
+              </h1>
+              <p className="text-muted-foreground">
+                Choose a budgeting rule to get started
+              </p>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold mb-2">Welcome to FinanceFlow</h1>
-          <p className="text-muted-foreground">
-            Choose a budgeting rule to get started
-          </p>
         </div>
 
-        <div className="space-y-3 mb-6">
-          {budgetRules.map((item) => (
-            <Card
-              key={item.rule}
-              className={`p-4 cursor-pointer transition-all hover:shadow-md ${
-                selectedRule === item.rule
-                  ? "ring-2 ring-primary bg-primary/5"
-                  : ""
-              }`}
-              onClick={() => setSelectedRule(item.rule)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold">{item.title}</h3>
-                    {item.popular && (
-                      <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
-                        Popular
-                      </span>
-                    )}
+        <Card className="p-6">
+          <h2 className="text-xl font-semibold mb-6 text-center">
+            Select Your Budgeting Strategy
+          </h2>
+          <div className="space-y-4">
+            {budgetRules.map((budget) => (
+              <div
+                key={budget.rule}
+                className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  selectedRule === budget.rule
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+                onClick={() => setSelectedRule(budget.rule)}
+              >
+                {budget.popular && (
+                  <div className="absolute -top-2 left-4 bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full">
+                    Popular
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
-                </div>
-                <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                    selectedRule === item.rule
-                      ? "border-primary bg-primary"
-                      : "border-muted"
-                  }`}
-                >
-                  {selectedRule === item.rule && (
-                    <Check className="w-4 h-4 text-white" />
+                )}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">{budget.title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {budget.description}
+                    </p>
+                  </div>
+                  {selectedRule === budget.rule && (
+                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-4 h-4 text-primary-foreground" />
+                    </div>
                   )}
                 </div>
               </div>
-            </Card>
-          ))}
-        </div>
-
-        <Button
-          onClick={handleContinue}
-          className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
-          size="lg"
-        >
-          Continue to Dashboard
-        </Button>
+            ))}
+          </div>
+          <Button
+            onClick={handleContinue}
+            className="w-full mt-6 bg-gradient-primary"
+          >
+            Continue
+          </Button>
+        </Card>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { transactionService, CreateTransactionData } from "@/services/transactio
 import { budgetService } from "@/services/budgetService";
 import { goalService, CreateGoalData } from "@/services/goalService";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "./AuthContext";
 
 export type BudgetRule = "50/30/20" | "60/20/20" | "70/20/10" | "custom";
 export type TransactionCategory = "needs" | "wants" | "savings";
@@ -32,17 +33,29 @@ export interface BudgetAllocation {
   savings: number;
 }
 
+export interface Budget {
+  id: string;
+  rule: BudgetRule;
+  customAllocation?: BudgetAllocation;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface FinanceContextType {
-  budgetRule: BudgetRule;
-  setBudgetRule: (rule: BudgetRule) => Promise<void>;
-  budgetAllocation: BudgetAllocation;
   transactions: Transaction[];
   addTransaction: (transaction: Omit<Transaction, "id" | "date"> & { date?: string }) => Promise<void>;
+  updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
-  goals: Goal[];
+  budget: Budget | null;
+  budgetRule: BudgetRule;
+  budgetAllocation: BudgetAllocation;
+  setBudgetRule: (rule: BudgetRule) => void;
+  addBudget: (data: { rule: BudgetRule; customAllocation?: BudgetAllocation }) => Promise<void>;
+  updateBudget: (data: { rule: BudgetRule; customAllocation?: BudgetAllocation }) => Promise<void>;
   addGoal: (goal: Omit<Goal, "id" | "currentAmount"> & { currentAmount?: number }) => Promise<void>;
   updateGoal: (id: string, updates: Partial<Goal>) => Promise<void>;
   deleteGoal: (id: string) => Promise<void>;
+  goals: Goal[];
   totalIncome: number;
   totalExpenses: number;
   balance: number;
@@ -61,29 +74,69 @@ const BUDGET_RULES: Record<BudgetRule, BudgetAllocation> = {
   custom: { needs: 33, wants: 33, savings: 34 },
 };
 
+// Helper function to validate and clean transaction data
+const validateTransaction = (transaction: any): Transaction | null => {
+  if (!transaction || typeof transaction !== 'object') return null;
+  
+  const { id, amount, category, type, description, date } = transaction;
+  
+  // Validate required fields
+  if (!id || !category || !type || !description || !date) {
+    return null;
+  }
+  
+  // Convert amount to number (handle both string and number)
+  const numericAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
+  if (isNaN(numericAmount) || numericAmount < 0) {
+    return null;
+  }
+  
+  return {
+    id: String(id),
+    amount: numericAmount,
+    category: String(category) as TransactionCategory,
+    type: String(type) as TransactionType,
+    description: String(description),
+    date: String(date),
+  };
+};
+
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(() => {
-    const saved = localStorage.getItem("finance-onboarding");
+    const saved = localStorage.getItem("countcoins-onboarding");
     return saved === "true";
   });
 
-  // Check if user is authenticated
-  const isAuthenticated = !!localStorage.getItem("auth-token");
-
   // Fetch transactions
-  const { data: transactions = [], isLoading: isLoadingTransactions } = useQuery({
+  const { data: rawTransactions = [], isLoading: isLoadingTransactions } = useQuery({
     queryKey: ["transactions"],
     queryFn: transactionService.getTransactions,
     enabled: isAuthenticated,
+    retry: false,
   });
+
+  // Validate and clean transactions
+  const transactions = React.useMemo(() => {
+    if (!Array.isArray(rawTransactions)) {
+      return [];
+    }
+    
+    const validTransactions = rawTransactions
+      .map(validateTransaction)
+      .filter((transaction): transaction is Transaction => transaction !== null);
+    
+    return validTransactions;
+  }, [rawTransactions]);
 
   // Fetch budget
   const { data: budget } = useQuery({
     queryKey: ["budget"],
     queryFn: budgetService.getBudget,
     enabled: isAuthenticated,
+    retry: false,
   });
 
   // Fetch goals
@@ -91,6 +144,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     queryKey: ["goals"],
     queryFn: goalService.getGoals,
     enabled: isAuthenticated,
+    retry: false,
   });
 
   const budgetRule: BudgetRule = budget?.rule || "50/30/20";
@@ -99,16 +153,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Mutations
   const updateBudgetMutation = useMutation({
     mutationFn: (data: { rule: BudgetRule; customAllocation?: BudgetAllocation }) => {
-      if (budget) {
-        return budgetService.updateBudget(data);
-      }
-      return budgetService.createBudget(data);
+      return budgetService.createOrUpdateBudget(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget"] });
       toast({ title: "Success", description: "Budget updated successfully" });
     },
     onError: (error: any) => {
+      console.error('Budget mutation failed:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update budget",
@@ -117,11 +169,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     },
   });
 
-  const createTransactionMutation = useMutation({
-    mutationFn: transactionService.createTransaction,
+  const addTransactionMutation = useMutation({
+    mutationFn: (data: CreateTransactionData) => transactionService.createTransaction(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["budget"] });
       toast({ title: "Success", description: "Transaction added successfully" });
     },
     onError: (error: any) => {
@@ -133,11 +184,26 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     },
   });
 
-  const deleteTransactionMutation = useMutation({
-    mutationFn: transactionService.deleteTransaction,
+  const updateTransactionMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Transaction> }) =>
+      transactionService.updateTransaction(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["budget"] });
+      toast({ title: "Success", description: "Transaction updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update transaction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: (id: string) => transactionService.deleteTransaction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
       toast({ title: "Success", description: "Transaction deleted successfully" });
     },
     onError: (error: any) => {
@@ -149,16 +215,16 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     },
   });
 
-  const createGoalMutation = useMutation({
-    mutationFn: goalService.createGoal,
+  const addGoalMutation = useMutation({
+    mutationFn: (data: CreateGoalData) => goalService.createGoal(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["goals"] });
-      toast({ title: "Success", description: "Goal added successfully" });
+      toast({ title: "Success", description: "Goal created successfully" });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to add goal",
+        description: error.message || "Failed to create goal",
         variant: "destructive",
       });
     },
@@ -181,7 +247,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
 
   const deleteGoalMutation = useMutation({
-    mutationFn: goalService.deleteGoal,
+    mutationFn: (id: string) => goalService.deleteGoal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["goals"] });
       toast({ title: "Success", description: "Goal deleted successfully" });
@@ -195,80 +261,93 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     },
   });
 
-  // Helper functions
-  const setBudgetRuleAsync = async (rule: BudgetRule) => {
-    await updateBudgetMutation.mutateAsync({ rule });
+  // Calculate totals
+  const totalIncome = React.useMemo(() => {
+    return transactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => {
+        const amount = Number(t.amount);
+        return isNaN(amount) ? sum : sum + amount;
+      }, 0);
+  }, [transactions]);
+
+  const totalExpenses = React.useMemo(() => {
+    return transactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => {
+        const amount = Number(t.amount);
+        return isNaN(amount) ? sum : sum + amount;
+      }, 0);
+  }, [transactions]);
+
+  const balance = React.useMemo(() => {
+    return totalIncome - totalExpenses;
+  }, [totalIncome, totalExpenses]);
+
+  const isLoading = isLoadingTransactions || isLoadingGoals;
+
+  const setBudgetRule = (rule: BudgetRule) => {
+    updateBudgetMutation.mutate({ rule });
+  };
+
+  const addBudget = async (data: { rule: BudgetRule; customAllocation?: BudgetAllocation }) => {
+    updateBudgetMutation.mutate(data);
+  };
+
+  const updateBudget = async (data: { rule: BudgetRule; customAllocation?: BudgetAllocation }) => {
+    updateBudgetMutation.mutate(data);
   };
 
   const addTransaction = async (transaction: Omit<Transaction, "id" | "date"> & { date?: string }) => {
-    const data: CreateTransactionData = {
-      amount: transaction.amount,
-      category: transaction.category,
-      type: transaction.type,
-      description: transaction.description,
-      date: transaction.date,
-    };
-    await createTransactionMutation.mutateAsync(data);
+    addTransactionMutation.mutate(transaction);
+  };
+
+  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    updateTransactionMutation.mutate({ id, updates });
   };
 
   const deleteTransaction = async (id: string) => {
-    await deleteTransactionMutation.mutateAsync(id);
+    deleteTransactionMutation.mutate(id);
   };
 
   const addGoal = async (goal: Omit<Goal, "id" | "currentAmount"> & { currentAmount?: number }) => {
-    const data: CreateGoalData = {
-      title: goal.title,
-      targetAmount: goal.targetAmount,
-      currentAmount: goal.currentAmount,
-      deadline: goal.deadline,
-    };
-    await createGoalMutation.mutateAsync(data);
+    addGoalMutation.mutate(goal);
   };
 
   const updateGoal = async (id: string, updates: Partial<Goal>) => {
-    await updateGoalMutation.mutateAsync({ id, updates });
+    updateGoalMutation.mutate({ id, updates });
   };
 
   const deleteGoal = async (id: string) => {
-    await deleteGoalMutation.mutateAsync(id);
+    deleteGoalMutation.mutate(id);
   };
 
   const completeOnboarding = () => {
     setHasCompletedOnboarding(true);
-    localStorage.setItem("finance-onboarding", "true");
+    localStorage.setItem("countcoins-onboarding", "true");
   };
 
   const refetchAll = () => {
-    queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    queryClient.invalidateQueries({ queryKey: ["budget"] });
-    queryClient.invalidateQueries({ queryKey: ["goals"] });
+    queryClient.invalidateQueries();
   };
-
-  const totalIncome = transactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const totalExpenses = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const balance = totalIncome - totalExpenses;
-
-  const isLoading = isLoadingTransactions || isLoadingGoals;
 
   return (
     <FinanceContext.Provider
       value={{
-        budgetRule,
-        setBudgetRule: setBudgetRuleAsync,
-        budgetAllocation,
         transactions,
         addTransaction,
+        updateTransaction,
         deleteTransaction,
-        goals,
+        budget,
+        budgetRule,
+        budgetAllocation,
+        setBudgetRule,
+        addBudget,
+        updateBudget,
         addGoal,
         updateGoal,
         deleteGoal,
+        goals,
         totalIncome,
         totalExpenses,
         balance,

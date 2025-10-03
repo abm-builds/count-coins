@@ -64,5 +64,23 @@ export const authService = {
   async deleteAccount(): Promise<void> {
     await apiClient.delete('/auth/me');
   },
+
+  // Request password reset
+  async requestPasswordReset(email: string): Promise<void> {
+    const response = await apiClient.post<ApiResponse>(
+      '/auth/forgot-password',
+      { email }
+    );
+    return response.data;
+  },
+
+  // Reset password with token
+  async resetPassword(token: string, password: string): Promise<void> {
+    const response = await apiClient.post<ApiResponse>(
+      '/auth/reset-password',
+      { token, password }
+    );
+    return response.data;
+  },
 };
 

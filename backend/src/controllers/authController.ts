@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthService } from '@/services/authService';
 import { validateRequest } from '@/utils/validation';
-import { signupSchema, loginSchema } from '@/utils/validation';
+import { signupSchema, loginSchema, requestPasswordResetSchema, resetPasswordSchema } from '@/utils/validation';
 import { asyncHandler } from '@/middleware/errorHandler';
 import { AuthenticatedRequest } from '@/middleware/auth';
 
@@ -54,6 +54,26 @@ export class AuthController {
     res.json({
       success: true,
       message: 'Account deleted successfully',
+    });
+  });
+
+  static requestPasswordReset = asyncHandler(async (req: Request, res: Response) => {
+    const data = validateRequest(requestPasswordResetSchema, req.body);
+    await AuthService.requestPasswordReset(data.email);
+
+    res.json({
+      success: true,
+      message: 'If an account with that email exists, we have sent password reset instructions.',
+    });
+  });
+
+  static resetPassword = asyncHandler(async (req: Request, res: Response) => {
+    const data = validateRequest(resetPasswordSchema, req.body);
+    await AuthService.resetPassword(data.token, data.password);
+
+    res.json({
+      success: true,
+      message: 'Password has been reset successfully. You can now log in with your new password.',
     });
   });
 }

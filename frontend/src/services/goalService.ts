@@ -19,36 +19,43 @@ export interface GoalProgress {
 export const goalService = {
   // Get all goals
   async getGoals(): Promise<Goal[]> {
-    const response = await apiClient.get<ApiResponse<{ goals: Goal[] }>>(
-      '/goals'
-    );
-    return response.data.data.goals;
+    try {
+      const response = await apiClient.get<ApiResponse<Goal[]>>(
+        '/goals'
+      );
+      return response.data.data || [];
+    } catch (error: any) {
+      if (error.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   },
 
   // Get a single goal
   async getGoal(id: string): Promise<Goal> {
-    const response = await apiClient.get<ApiResponse<{ goal: Goal }>>(
+    const response = await apiClient.get<ApiResponse<Goal>>(
       `/goals/${id}`
     );
-    return response.data.data.goal;
+    return response.data.data;
   },
 
   // Create a new goal
   async createGoal(data: CreateGoalData): Promise<Goal> {
-    const response = await apiClient.post<ApiResponse<{ goal: Goal }>>(
+    const response = await apiClient.post<ApiResponse<Goal>>(
       '/goals',
       data
     );
-    return response.data.data.goal;
+    return response.data.data;
   },
 
   // Update a goal
   async updateGoal(id: string, data: Partial<CreateGoalData>): Promise<Goal> {
-    const response = await apiClient.put<ApiResponse<{ goal: Goal }>>(
+    const response = await apiClient.put<ApiResponse<Goal>>(
       `/goals/${id}`,
       data
     );
-    return response.data.data.goal;
+    return response.data.data;
   },
 
   // Delete a goal

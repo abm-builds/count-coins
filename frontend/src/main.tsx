@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import "./index.css";
 import * as serviceWorkerRegistration from "./lib/serviceWorkerRegistration";
@@ -10,7 +11,11 @@ errorMonitoring;
 // Mark app start for performance monitoring
 performanceMonitoring.mark("app-start");
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+);
 
 // Register service worker for offline support
 serviceWorkerRegistration.register({

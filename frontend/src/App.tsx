@@ -1,64 +1,77 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import React, { Suspense, useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { FinanceProvider, useFinance } from "@/contexts/FinanceContext";
-import { BottomNav } from "@/components/BottomNav";
-import { Loader2 } from "lucide-react";
-import { lazy, Suspense } from "react";
+import { LandingPage } from "@/components/LandingPage";
 
-// Lazy load pages for better performance
-const Onboarding = lazy(() => import("./pages/Onboarding"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Transactions = lazy(() => import("./pages/Transactions"));
-const Goals = lazy(() => import("./pages/Goals"));
-const Settings = lazy(() => import("./pages/Settings"));
-const Login = lazy(() => import("./pages/Login"));
-const Signup = lazy(() => import("./pages/Signup"));
-const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+// Lazy load components for better performance
+const Login = React.lazy(() => import("@/pages/Login"));
+const Signup = React.lazy(() => import("@/pages/Signup"));
+const Dashboard = React.lazy(() => import("@/pages/Dashboard"));
+const Transactions = React.lazy(() => import("@/pages/Transactions"));
+const Goals = React.lazy(() => import("@/pages/Goals"));
+const Settings = React.lazy(() => import("@/pages/Settings"));
+const Onboarding = React.lazy(() => import("@/pages/Onboarding"));
+const ForgotPassword = React.lazy(() => import("@/pages/ForgotPassword"));
+const ResetPassword = React.lazy(() => import("@/pages/ResetPassword"));
+const NotFound = React.lazy(() => import("@/pages/NotFound"));
 
+// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
       retry: 1,
-      refetchOnWindowFocus: false,
     },
   },
 });
 
-// Loading component
+// Loading screen component
 const LoadingScreen = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 dark:from-gray-900 dark:via-purple-900 dark:to-gray-900">
+  <div className="min-h-screen flex items-center justify-center bg-background">
     <div className="text-center">
-      <Loader2 className="h-12 w-12 animate-spin text-purple-600 mx-auto mb-4" />
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
       <p className="text-lg text-muted-foreground">Loading...</p>
     </div>
   </div>
 );
 
-// Protected routes wrapper
-const ProtectedRoutes = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-  const { hasCompletedOnboarding } = useFinance();
+// Main App Router
+const AppRouter = () => {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { hasCompletedOnboarding, isLoading: financeLoading } = useFinance();
 
-  if (isLoading) {
+  if (authLoading || financeLoading) {
     return <LoadingScreen />;
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
+    );
   }
 
   if (!hasCompletedOnboarding) {
-    return <Onboarding />;
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <Onboarding />
+      </Suspense>
+    );
   }
 
   return (
-    <>
+    <Suspense fallback={<LoadingScreen />}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/transactions" element={<Transactions />} />
@@ -66,72 +79,34 @@ const ProtectedRoutes = () => {
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <BottomNav />
-    </>
-  );
-};
-
-// Auth routes wrapper
-const AuthRoutes = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
-  );
-};
-
-// Main App Router
-const AppRouter = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
-
-  return (
-    <Suspense fallback={<LoadingScreen />}>
-      <Routes>
-        {/* Public auth routes */}
-        <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" replace />} />
-        <Route path="/signup" element={!isAuthenticated ? <Signup /> : <Navigate to="/" replace />} />
-        <Route path="/forgot-password" element={!isAuthenticated ? <ForgotPassword /> : <Navigate to="/" replace />} />
-        
-        {/* Protected routes */}
-        <Route path="/onboarding" element={isAuthenticated ? <Onboarding /> : <Navigate to="/login" replace />} />
-        <Route path="/*" element={<ProtectedRoutes />} />
-      </Routes>
     </Suspense>
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <AuthProvider>
-        <FinanceProvider>
-          <TooltipProvider>
+// Main App component
+const App = () => {
+  const [showLanding, setShowLanding] = useState(true);
+
+  const handleLandingComplete = () => {
+    setShowLanding(false);
+  };
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+        <AuthProvider>
+          <FinanceProvider>
             <Toaster />
-            <Sonner />
-            <BrowserRouter>
+            {showLanding ? (
+              <LandingPage onComplete={handleLandingComplete} />
+            ) : (
               <AppRouter />
-            </BrowserRouter>
-          </TooltipProvider>
-        </FinanceProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+            )}
+          </FinanceProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

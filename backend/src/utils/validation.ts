@@ -1,68 +1,80 @@
 import { z } from 'zod';
-import { TransactionType, TransactionCategory, BudgetRule } from '@prisma/client';
+import { TransactionType, TransactionCategory, BudgetRule } from '@/types';
 
-// Auth validation schemas
-export const signupSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(8, 'Password must be at least 8 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
-});
-
+// Auth schemas
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email format'),
+  email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
 });
 
-// Transaction validation schemas
+export const signupSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  name: z.string().optional(),
+});
+
+export const requestPasswordResetSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+// Transaction schemas
 export const createTransactionSchema = z.object({
   amount: z.number().positive('Amount must be positive'),
-  type: z.nativeEnum(TransactionType),
-  category: z.nativeEnum(TransactionCategory),
-  description: z.string().min(1, 'Description is required').max(255, 'Description too long'),
+  type: z.enum(['INCOME', 'EXPENSE']),
+  category: z.enum(['NEEDS', 'WANTS', 'SAVINGS']),
+  description: z.string().min(1, 'Description is required').max(200, 'Description too long'),
   date: z.string().datetime().optional(),
 });
 
 export const updateTransactionSchema = createTransactionSchema.partial();
 
-// Budget validation schemas
+// Budget schemas
 export const createBudgetSchema = z.object({
-  rule: z.nativeEnum(BudgetRule),
-  needs: z.number().min(0).max(100).optional(),
-  wants: z.number().min(0).max(100).optional(),
-  savings: z.number().min(0).max(100).optional(),
-}).refine((data) => {
-  if (data.rule === BudgetRule.CUSTOM) {
-    const total = (data.needs || 0) + (data.wants || 0) + (data.savings || 0);
-    return total === 100;
-  }
-  return true;
-}, {
-  message: 'Custom budget percentages must total 100%',
+  rule: z.enum(['FIFTY_THIRTY_TWENTY', 'SIXTY_TWENTY_TWENTY', 'SEVENTY_TWENTY_TEN', 'CUSTOM']),
+  customAllocation: z.object({
+    needs: z.number().min(0).max(100),
+    wants: z.number().min(0).max(100),
+    savings: z.number().min(0).max(100),
+  }).optional(),
 });
 
-// Goal validation schemas
+export const updateBudgetSchema = createBudgetSchema.partial();
+
+// Goal schemas
 export const createGoalSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title too long'),
   targetAmount: z.number().positive('Target amount must be positive'),
-  deadline: z.string().datetime().optional(),
+  currentAmount: z.number().min(0).optional(),
+  deadline: z.string().optional().refine((val) => {
+    if (!val) return true; // Allow empty string
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    const datetimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+    return dateRegex.test(val) || datetimeRegex.test(val);
+  }, 'Deadline must be a valid date (YYYY-MM-DD) or datetime format'),
 });
 
-export const updateGoalSchema = z.object({
-  title: z.string().min(1).max(100).optional(),
-  targetAmount: z.number().positive().optional(),
-  currentAmount: z.number().min(0).optional(),
-  deadline: z.string().datetime().optional(),
-});
+export const updateGoalSchema = createGoalSchema.partial();
 
 // Query validation schemas
 export const paginationSchema = z.object({
-  page: z.string().transform(Number).pipe(z.number().min(1)).default('1'),
-  limit: z.string().transform(Number).pipe(z.number().min(1).max(100)).default('10'),
+  page: z.preprocess(
+    (val) => (val ? Number(val) : undefined),
+    z.number().min(1).optional().default(1)
+  ),
+  limit: z.preprocess(
+    (val) => (val ? Number(val) : undefined),
+    z.number().min(1).max(100).optional().default(10)
+  ),
 });
 
 export const transactionQuerySchema = paginationSchema.extend({
-  type: z.nativeEnum(TransactionType).optional(),
-  category: z.nativeEnum(TransactionCategory).optional(),
+  type: z.enum(['INCOME', 'EXPENSE']).optional(),
+  category: z.enum(['NEEDS', 'WANTS', 'SAVINGS']).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
 });
@@ -73,26 +85,24 @@ export const validateRequest = <T>(schema: z.ZodSchema<T>, data: unknown): T => 
     return schema.parse(data);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const formattedErrors = error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message,
-      }));
-      throw new Error(`Validation error: ${formattedErrors.map(e => `${e.field}: ${e.message}`).join(', ')}`);
+      const errorMessage = error.errors
+        .map((err) => `${err.path.join('.')}: ${err.message}`)
+        .join(', ');
+      throw new Error(`Validation error: ${errorMessage}`);
     }
     throw error;
   }
 };
 
-export const validateQuery = <T>(schema: z.ZodSchema<T>, query: any): T => {
+export const validateQuery = <T>(schema: z.ZodSchema<T>, data: unknown): T => {
   try {
-    return schema.parse(query);
+    return schema.parse(data);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const formattedErrors = error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message,
-      }));
-      throw new Error(`Query validation error: ${formattedErrors.map(e => `${e.field}: ${e.message}`).join(', ')}`);
+      const errorMessage = error.errors
+        .map((err) => `${err.path.join('.')}: ${err.message}`)
+        .join(', ');
+      throw new Error(`Validation error: ${errorMessage}`);
     }
     throw error;
   }
